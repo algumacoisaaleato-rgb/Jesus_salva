@@ -1,0 +1,71 @@
+name: Build Namaguederaz APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Instalar Capacitor
+        run: |
+          npm install
+          npm install @capacitor/core@7.4.0 @capacitor/cli@7.4.0 @capacitor/android@7.4.0
+
+      - name: Criar Android
+        run: npx cap add android
+
+      - name: Configurar botão físico Voltar
+        run: |
+          cat > android/app/src/main/java/com/namaguederaz/app/MainActivity.java <<'EOF'
+          package com.namaguederaz.app;
+
+          import android.webkit.WebView;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+
+              @Override
+              public void onBackPressed() {
+                  WebView webView = getBridge().getWebView();
+
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+          }
+          EOF
+
+      - name: Sincronizar Android
+        run: npx cap sync android
+
+      - name: Gerar APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Namaguederaz-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
